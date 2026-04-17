@@ -20,6 +20,7 @@ type AnySpeechRecognition = {
   onend: (() => void) | null;
   onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
   start: () => void;
+  stop: () => void;
 };
 
 type SpeechRecognitionConstructor = new () => AnySpeechRecognition;
