@@ -42,7 +42,13 @@ export default function ReviewPanel({ marks, lang, articleContext, onClose, onSt
         system: tutorExplanationPrompt(lang),
         messages: [{
           role: 'user',
-          content: `Context from the article:\n"${context.slice(0, 800)}"\n\nExplain this word/phrase: "${text}"`,
+          content: [
+            `Context from the article:\n"${context.slice(0, 800)}"`,
+            `Word/phrase to explain: "${text}"`,
+            items[idx]?.question
+              ? `The learner's specific question: "${items[idx].question}"`
+              : '',
+          ].filter(Boolean).join('\n\n'),
         }],
       });
       const explanation = res.content[0].type === 'text' ? res.content[0].text : '';
@@ -89,7 +95,12 @@ export default function ReviewPanel({ marks, lang, articleContext, onClose, onSt
                 onClick={() => toggleExpanded(idx)}
                 className="flex w-full items-center justify-between text-left"
               >
-                <span className="font-serif text-lg text-ink">"{item.text}"</span>
+                <span className="font-serif text-lg text-ink">
+                "{item.text}"
+                {item.question && (
+                  <span className="ml-2 text-xs font-sans text-neutral-400 font-normal">— {item.question}</span>
+                )}
+              </span>
                 <span className="ml-3 text-neutral-400">{item.expanded ? '▲' : '▼'}</span>
               </button>
 
