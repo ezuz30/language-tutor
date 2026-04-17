@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5173"],
+      "name": "language-tutor",
+      "runtimeExecutable": "/opt/homebrew/opt/node/bin/npm",
+      "runtimeArgs": ["run", "dev"],
       "port": 5173
     }
   ]
