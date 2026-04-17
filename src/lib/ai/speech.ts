@@ -11,20 +11,30 @@ export async function transcribeAudio(audio: Blob, languageCode: string): Promis
 
 // Web Speech API live transcription — returns a promise that resolves when the
 // user stops speaking. Call this instead of transcribeAudio for real-time mic input.
+type AnySpeechRecognition = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  continuous: boolean;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
+  start: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => AnySpeechRecognition;
+
 export function transcribeWithWebSpeech(languageLocale: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition })
-        .SpeechRecognition ??
-      (window as unknown as { webkitSpeechRecognition?: typeof window.SpeechRecognition })
-        .webkitSpeechRecognition;
+    const w = window as unknown as { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
+    if (!SR) {
       reject(new Error('Speech recognition is not supported in this browser. Use Chrome or Safari.'));
       return;
     }
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SR();
     recognition.lang = languageLocale;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
@@ -32,7 +42,7 @@ export function transcribeWithWebSpeech(languageLocale: string): Promise<string>
 
     let finalTranscript = '';
 
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
           finalTranscript += event.results[i][0].transcript + ' ';
@@ -41,7 +51,7 @@ export function transcribeWithWebSpeech(languageLocale: string): Promise<string>
     };
 
     recognition.onend = () => resolve(finalTranscript.trim());
-    recognition.onerror = (e) => reject(new Error(`Speech recognition error: ${e.error}`));
+    recognition.onerror = (e: SpeechRecognitionErrorEvent) => reject(new Error(`Speech recognition error: ${e.error}`));
 
     recognition.start();
   });

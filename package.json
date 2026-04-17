@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
     "@mozilla/readability": "^0.6.0",
+    "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.2.2",
     "dompurify": "^3.4.0",
     "openai": "^6.34.0",
