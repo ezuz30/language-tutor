@@ -159,7 +159,7 @@ export default function MarkableText({ html, onMarksChange }: Props) {
           <div className="w-72 rounded-2xl border border-neutral-200 bg-white shadow-xl">
             <div className="px-4 pt-4 pb-1">
               <p className="text-xs text-neutral-400 mb-2">
-                ¿Tienes alguna pregunta sobre <span className="font-medium text-ink">"{popup.text}"</span>?
+                Any specific question about <span className="font-medium text-ink">"{popup.text}"</span>?
               </p>
               <form
                 onSubmit={(e) => { e.preventDefault(); confirmMark(popup.id, question); }}
@@ -168,7 +168,7 @@ export default function MarkableText({ html, onMarksChange }: Props) {
                   autoFocus
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
-                  placeholder="¿Qué significa aquí exactamente…?"
+                  placeholder="e.g. Is this an idiom? Why not ser here?"
                   className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none transition focus:border-ink"
                 />
                 <div className="mt-3 flex items-center justify-between pb-3">
@@ -177,13 +177,13 @@ export default function MarkableText({ html, onMarksChange }: Props) {
                     onClick={() => confirmMark(popup.id, '')}
                     className="text-xs text-neutral-400 hover:text-neutral-600"
                   >
-                    Saltar →
+                    Skip →
                   </button>
                   <button
                     type="submit"
                     className="rounded-full bg-ink px-4 py-1.5 text-xs text-paper hover:opacity-90"
                   >
-                    Confirmar
+                    Confirm
                   </button>
                 </div>
               </form>

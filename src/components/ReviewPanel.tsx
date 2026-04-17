@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { getClient } from '@/lib/ai/claude';
-import { tutorExplanationPrompt } from '@/lib/ai/prompts';
+import { tutorExplanationPrompt, tutorExplanationNativePrompt } from '@/lib/ai/prompts';
 import type { LanguageConfig } from '@/languages/types';
 import type { Mark } from './MarkableText';
 import TutorChat from './TutorChat';
 
 interface ExplainedMark extends Mark {
   explanation: string | null;
+  nativeExplanation: string | null;
   loading: boolean;
+  loadingNative: boolean;
+  showNative: boolean;
   saved: boolean;
   expanded: boolean;
 }
@@ -22,44 +25,74 @@ interface Props {
 
 export default function ReviewPanel({ marks, lang, articleContext, onClose, onStartSpeaking }: Props) {
   const [items, setItems] = useState<ExplainedMark[]>(
-    marks.map((m) => ({ ...m, explanation: null, loading: true, saved: false, expanded: false }))
+    marks.map((m) => ({
+      ...m,
+      explanation: null,
+      nativeExplanation: null,
+      loading: true,
+      loadingNative: false,
+      showNative: false,
+      saved: false,
+      expanded: false,
+    }))
   );
 
   useEffect(() => {
     items.forEach((item, idx) => {
       if (item.explanation !== null) return;
-      explain(item.text, idx, articleContext);
+      fetchExplanation(item, idx, false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function explain(text: string, idx: number, context: string) {
+  async function fetchExplanation(item: ExplainedMark, idx: number, native: boolean) {
+    const loadingKey = native ? 'loadingNative' : 'loading';
+    const resultKey = native ? 'nativeExplanation' : 'explanation';
+    const systemPrompt = native ? tutorExplanationNativePrompt(lang) : tutorExplanationPrompt(lang);
+
     try {
       const client = getClient();
       const res = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 400,
-        system: tutorExplanationPrompt(lang),
+        system: systemPrompt,
         messages: [{
           role: 'user',
           content: [
-            `Context from the article:\n"${context.slice(0, 800)}"`,
-            `Word/phrase to explain: "${text}"`,
-            items[idx]?.question
-              ? `The learner's specific question: "${items[idx].question}"`
-              : '',
+            `Context from the article:\n"${articleContext.slice(0, 800)}"`,
+            `Word/phrase to explain: "${item.text}"`,
+            item.question ? `The learner's specific question: "${item.question}"` : '',
           ].filter(Boolean).join('\n\n'),
         }],
       });
-      const explanation = res.content[0].type === 'text' ? res.content[0].text : '';
+      const text = res.content[0].type === 'text' ? res.content[0].text : '';
       setItems((prev) =>
-        prev.map((it, i) => i === idx ? { ...it, explanation, loading: false, expanded: true } : it)
+        prev.map((it, i) =>
+          i === idx ? { ...it, [resultKey]: text, [loadingKey]: false, expanded: true } : it
+        )
       );
     } catch {
       setItems((prev) =>
-        prev.map((it, i) => i === idx ? { ...it, explanation: 'Error loading explanation.', loading: false } : it)
+        prev.map((it, i) =>
+          i === idx ? { ...it, [resultKey]: 'Error loading explanation.', [loadingKey]: false } : it
+        )
       );
     }
+  }
+
+  function toggleLanguage(idx: number) {
+    setItems((prev) =>
+      prev.map((it, i) => {
+        if (i !== idx) return it;
+        const goingNative = !it.showNative;
+        // Fetch native explanation lazily on first toggle
+        if (goingNative && it.nativeExplanation === null && !it.loadingNative) {
+          fetchExplanation({ ...it }, idx, true);
+          return { ...it, showNative: true, loadingNative: true };
+        }
+        return { ...it, showNative: goingNative };
+      })
+    );
   }
 
   function toggleExpanded(idx: number) {
@@ -72,57 +105,91 @@ export default function ReviewPanel({ marks, lang, articleContext, onClose, onSt
     setItems((prev) =>
       prev.map((it, i) => i === idx ? { ...it, saved: !it.saved } : it)
     );
-    // TODO: persist to vocab store in next iteration
   }
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
       <div className="flex-1 bg-ink/20 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Panel */}
       <div className="w-full max-w-md overflow-y-auto bg-paper px-6 py-8 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="font-serif text-2xl">Revisión</h2>
+          <h2 className="font-serif text-2xl">Review</h2>
           <button onClick={onClose} className="text-neutral-400 hover:text-ink">✕</button>
         </div>
-        <p className="mt-1 text-sm text-neutral-500">{items.length} {items.length === 1 ? 'palabra' : 'palabras'} marcadas</p>
+        <p className="mt-1 text-sm text-neutral-500">
+          {items.length} {items.length === 1 ? 'word' : 'words'} marked
+        </p>
 
         <div className="mt-6 space-y-6">
           {items.map((item, idx) => (
             <div key={item.id} className="border-b border-neutral-100 pb-6">
+              {/* Header row */}
               <button
                 onClick={() => toggleExpanded(idx)}
                 className="flex w-full items-center justify-between text-left"
               >
                 <span className="font-serif text-lg text-ink">
-                "{item.text}"
-                {item.question && (
-                  <span className="ml-2 text-xs font-sans text-neutral-400 font-normal">— {item.question}</span>
-                )}
-              </span>
-                <span className="ml-3 text-neutral-400">{item.expanded ? '▲' : '▼'}</span>
+                  "{item.text}"
+                  {item.question && (
+                    <span className="ml-2 text-xs font-sans text-neutral-400 font-normal">— {item.question}</span>
+                  )}
+                </span>
+                <span className="ml-3 shrink-0 text-neutral-400">{item.expanded ? '▲' : '▼'}</span>
               </button>
 
               {item.expanded && (
                 <div className="mt-3">
-                  {item.loading ? (
-                    <p className="text-sm text-neutral-400 animate-pulse">Pensando…</p>
+                  {/* Language toggle */}
+                  <div className="mb-3 flex items-center gap-1">
+                    <button
+                      onClick={() => !item.showNative && toggleLanguage(idx)}
+                      className={`rounded-full px-3 py-1 text-xs transition ${
+                        !item.showNative
+                          ? 'bg-ink text-paper'
+                          : 'text-neutral-400 hover:text-ink'
+                      }`}
+                    >
+                      {lang.name}
+                    </button>
+                    <button
+                      onClick={() => item.showNative && toggleLanguage(idx) || !item.showNative && toggleLanguage(idx)}
+                      className={`rounded-full px-3 py-1 text-xs transition ${
+                        item.showNative
+                          ? 'bg-ink text-paper'
+                          : 'text-neutral-400 hover:text-ink'
+                      }`}
+                    >
+                      English
+                    </button>
+                  </div>
+
+                  {/* Explanation */}
+                  {item.showNative ? (
+                    item.loadingNative ? (
+                      <p className="text-sm text-neutral-400 animate-pulse">Loading…</p>
+                    ) : (
+                      <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap">
+                        {item.nativeExplanation}
+                      </p>
+                    )
                   ) : (
-                    <>
+                    item.loading ? (
+                      <p className="text-sm text-neutral-400 animate-pulse">Pensando…</p>
+                    ) : (
                       <TutorChat
                         lang={lang}
                         markedText={item.text}
                         initialExplanation={item.explanation ?? ''}
                       />
-                      <button
-                        onClick={() => toggleSaved(idx)}
-                        className={`mt-3 text-xs ${item.saved ? 'text-accent font-medium' : 'text-neutral-400 hover:text-ink'}`}
-                      >
-                        {item.saved ? '✓ Guardado' : lang.ui.saveToVocab}
-                      </button>
-                    </>
+                    )
                   )}
+
+                  <button
+                    onClick={() => toggleSaved(idx)}
+                    className={`mt-3 text-xs ${item.saved ? 'text-amber-600 font-medium' : 'text-neutral-400 hover:text-ink'}`}
+                  >
+                    {item.saved ? '✓ Saved' : 'Save to vocab'}
+                  </button>
                 </div>
               )}
             </div>
