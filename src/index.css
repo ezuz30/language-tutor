@@ -20,3 +20,33 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── Marked words ─────────────────────────────────────── */
+.lt-mark {
+  background: transparent;
+  color: inherit;
+  border-radius: 3px;
+  padding: 1px 2px;
+  cursor: pointer;
+  position: relative;
+  /* Elegant amber underline */
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  transition: background-color 150ms ease, text-decoration-color 150ms ease;
+}
+
+.lt-mark:hover {
+  background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+/* Flash animation when a word is first marked */
+@keyframes lt-flash {
+  0%   { background-color: color-mix(in srgb, var(--color-accent) 55%, transparent); }
+  100% { background-color: transparent; }
+}
+
+.lt-mark--new {
+  animation: lt-flash 0.55s ease-out forwards;
+}

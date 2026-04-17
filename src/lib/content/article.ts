@@ -4,29 +4,50 @@ import DOMPurify from 'dompurify';
 export interface Article {
   title: string;
   byline: string;
-  content: string; // sanitised HTML
-  textContent: string; // plain text
+  content: string;
+  textContent: string;
   siteName: string;
   url: string;
 }
 
-const PROXY = 'https://api.allorigins.win/get?url=';
+const PROXIES = [
+  (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  (url: string) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+];
+
+async function fetchRaw(url: string): Promise<string> {
+  let lastError = '';
+  for (const makeProxy of PROXIES) {
+    try {
+      const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) { lastError = `HTTP ${res.status}`; continue; }
+      const text = await res.text();
+      // allorigins wraps in JSON; others return raw HTML
+      try {
+        const json = JSON.parse(text) as { contents?: string };
+        if (json.contents) return json.contents;
+      } catch {
+        // not JSON — return raw HTML
+      }
+      return text;
+    } catch (e) {
+      lastError = String(e);
+    }
+  }
+  throw new Error(`Could not load the article. ${lastError}. Try pasting the article text directly instead.`);
+}
 
 export async function fetchArticle(url: string): Promise<Article> {
-  const proxyUrl = `${PROXY}${encodeURIComponent(url)}`;
-  const res = await fetch(proxyUrl);
-  if (!res.ok) throw new Error(`Failed to fetch article (${res.status})`);
-  const data = await res.json() as { contents: string };
-
-  const doc = new DOMParser().parseFromString(data.contents, 'text/html');
-  // Set base so relative URLs resolve correctly
+  const html = await fetchRaw(url);
+  const doc = new DOMParser().parseFromString(html, 'text/html');
   const base = doc.createElement('base');
   base.href = url;
   doc.head.appendChild(base);
 
   const reader = new Readability(doc, { charThreshold: 100 });
   const parsed = reader.parse();
-  if (!parsed) throw new Error('Could not extract article content from this page.');
+  if (!parsed) throw new Error('Could not extract article text from this page. Try pasting the text directly.');
 
   return {
     title: parsed.title ?? '',

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 
 export interface Mark {
   id: string;
@@ -12,71 +12,74 @@ interface Props {
 
 export default function MarkableText({ html, onMarksChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [marks, setMarks] = useState<Mark[]>([]);
+  const marksRef = useRef<Mark[]>([]);
 
-  const addMark = useCallback((text: string) => {
-    const trimmed = text.trim();
+  // Set innerHTML once — we manage all changes directly in the DOM after that.
+  useEffect(() => {
+    if (containerRef.current) containerRef.current.innerHTML = html;
+    marksRef.current = [];
+  }, [html]);
+
+  const addMark = useCallback((text: string, range: Range) => {
+    const trimmed = text.trim().replace(/\s+/g, ' ');
     if (!trimmed || trimmed.length < 2) return;
-    setMarks((prev) => {
-      if (prev.some((m) => m.text === trimmed)) return prev;
-      const next = [...prev, { id: crypto.randomUUID(), text: trimmed }];
-      onMarksChange(next);
-      return next;
-    });
+    if (marksRef.current.some((m) => m.text === trimmed)) return;
+
+    const id = crypto.randomUUID();
+    try {
+      const el = document.createElement('mark');
+      el.className = 'lt-mark';
+      el.dataset.markId = id;
+      range.surroundContents(el);
+      // Trigger the flash animation on next frame
+      requestAnimationFrame(() => {
+        el.classList.add('lt-mark--new');
+        el.addEventListener('animationend', () => el.classList.remove('lt-mark--new'), { once: true });
+      });
+    } catch {
+      // surroundContents fails when selection crosses block elements — skip visual wrap
+    }
+
+    const next = [...marksRef.current, { id, text: trimmed }];
+    marksRef.current = next;
+    onMarksChange(next);
   }, [onMarksChange]);
 
   function handleMouseUp() {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0).cloneRange();
     const text = sel.toString();
-    if (text.trim()) {
-      addMark(text);
-      sel.removeAllRanges();
-    }
+    sel.removeAllRanges();
+    if (text.trim()) addMark(text, range);
   }
 
   function handleClick(e: React.MouseEvent) {
     const sel = window.getSelection();
-    if (sel && !sel.isCollapsed) return; // handled by mouseup
+    if (sel && !sel.isCollapsed) return; // drag-select handled above
     const target = e.target as HTMLElement;
-    const word = target.closest('[data-word]');
-    if (word) {
-      addMark(word.textContent ?? '');
+    if (target.closest('.lt-mark')) return; // already marked
+
+    // Expand caret position to a full word using browser APIs
+    const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (!range) return;
+
+    // Use Selection.modify to expand to word boundaries
+    const tmpSel = window.getSelection();
+    if (!tmpSel) return;
+    tmpSel.removeAllRanges();
+    tmpSel.addRange(range);
+    tmpSel.modify('move', 'backward', 'word');
+    tmpSel.modify('extend', 'forward', 'word');
+
+    const wordRange = tmpSel.rangeCount > 0 ? tmpSel.getRangeAt(0).cloneRange() : null;
+    tmpSel.removeAllRanges();
+
+    if (wordRange) {
+      const text = wordRange.toString();
+      if (text.trim().length > 1) addMark(text, wordRange);
     }
   }
-
-  // Wrap each word in a span so single-click works
-  function buildWordWrapped(rawHtml: string): string {
-    const div = document.createElement('div');
-    div.innerHTML = rawHtml;
-    wrapWords(div);
-    return div.innerHTML;
-  }
-
-  function wrapWords(node: Node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent ?? '';
-      if (!text.trim()) return;
-      const span = document.createElement('span');
-      span.innerHTML = text.replace(/(\S+)/g, '<span data-word>$1</span>');
-      node.parentNode?.replaceChild(span, node);
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = node as Element;
-      const tag = el.tagName.toLowerCase();
-      if (['script', 'style', 'code', 'pre'].includes(tag)) return;
-      Array.from(node.childNodes).forEach(wrapWords);
-    }
-  }
-
-  const wrappedHtml = buildWordWrapped(html);
-
-  const highlightedHtml = marks.reduce((acc, mark) => {
-    const escaped = mark.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return acc.replace(
-      new RegExp(`(${escaped})`, 'g'),
-      `<mark class="bg-yellow-200 rounded px-0.5 cursor-pointer" data-mark-id="${mark.id}">$1</mark>`
-    );
-  }, wrappedHtml);
 
   return (
     <div
@@ -84,7 +87,6 @@ export default function MarkableText({ html, onMarksChange }: Props) {
       className="prose prose-lg max-w-none cursor-text select-text font-serif leading-relaxed"
       onMouseUp={handleMouseUp}
       onClick={handleClick}
-      dangerouslySetInnerHTML={{ __html: highlightedHtml }}
     />
   );
 }
