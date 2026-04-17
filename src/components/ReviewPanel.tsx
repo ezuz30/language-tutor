@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { getClient } from '@/lib/ai/claude';
 import { tutorExplanationPrompt, tutorExplanationNativePrompt } from '@/lib/ai/prompts';
 import type { LanguageConfig } from '@/languages/types';
+import type { LearnerLevel, Audience } from '@/lib/store/keys';
+import { updateVocabSaved } from '@/lib/store/history';
 import type { Mark } from './MarkableText';
 import TutorChat from './TutorChat';
 
@@ -18,12 +20,16 @@ interface ExplainedMark extends Mark {
 interface Props {
   marks: Mark[];
   lang: LanguageConfig;
+  level?: LearnerLevel;
+  audience?: Audience;
+  nativeLang?: string;
+  sessionId?: string;
   articleContext: string;
   onClose: () => void;
   onStartSpeaking: () => void;
 }
 
-export default function ReviewPanel({ marks, lang, articleContext, onClose, onStartSpeaking }: Props) {
+export default function ReviewPanel({ marks, lang, level = 'intermediate', audience = 'adult', nativeLang = 'English', sessionId, articleContext, onClose, onStartSpeaking }: Props) {
   const [items, setItems] = useState<ExplainedMark[]>(
     marks.map((m) => ({
       ...m,
@@ -48,7 +54,7 @@ export default function ReviewPanel({ marks, lang, articleContext, onClose, onSt
   async function fetchExplanation(item: ExplainedMark, idx: number, native: boolean) {
     const loadingKey = native ? 'loadingNative' : 'loading';
     const resultKey = native ? 'nativeExplanation' : 'explanation';
-    const systemPrompt = native ? tutorExplanationNativePrompt(lang) : tutorExplanationPrompt(lang);
+    const systemPrompt = native ? tutorExplanationNativePrompt(lang, level, audience, nativeLang) : tutorExplanationPrompt(lang, level, audience);
 
     try {
       const client = getClient();
@@ -103,7 +109,12 @@ export default function ReviewPanel({ marks, lang, articleContext, onClose, onSt
 
   function toggleSaved(idx: number) {
     setItems((prev) =>
-      prev.map((it, i) => i === idx ? { ...it, saved: !it.saved } : it)
+      prev.map((it, i) => {
+        if (i !== idx) return it;
+        const next = { ...it, saved: !it.saved };
+        if (sessionId) updateVocabSaved(sessionId, it.id, next.saved);
+        return next;
+      })
     );
   }
 
@@ -152,14 +163,14 @@ export default function ReviewPanel({ marks, lang, articleContext, onClose, onSt
                       {lang.name}
                     </button>
                     <button
-                      onClick={() => item.showNative && toggleLanguage(idx) || !item.showNative && toggleLanguage(idx)}
+                      onClick={() => toggleLanguage(idx)}
                       className={`rounded-full px-3 py-1 text-xs transition ${
                         item.showNative
                           ? 'bg-ink text-paper'
                           : 'text-neutral-400 hover:text-ink'
                       }`}
                     >
-                      English
+                      {nativeLang}
                     </button>
                   </div>
 
@@ -178,6 +189,8 @@ export default function ReviewPanel({ marks, lang, articleContext, onClose, onSt
                     ) : (
                       <TutorChat
                         lang={lang}
+                        level={level}
+                        audience={audience}
                         markedText={item.text}
                         initialExplanation={item.explanation ?? ''}
                       />

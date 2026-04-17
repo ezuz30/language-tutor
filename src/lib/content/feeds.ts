@@ -11,28 +11,33 @@ export interface FeedItem {
 
 const PROXIES = [
   (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url: string) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
+  (url: string) => `https://cors.eu.org/${url}`,
 ];
 
+async function tryProxyXml(makeProxy: (u: string) => string, url: string): Promise<Document> {
+  const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(7000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  let raw = text;
+  try {
+    const json = JSON.parse(text) as { contents?: string };
+    if (json.contents) raw = json.contents;
+  } catch { /* raw XML */ }
+  const doc = new DOMParser().parseFromString(raw, 'text/xml');
+  if (doc.querySelector('parsererror')) throw new Error('Invalid XML');
+  return doc;
+}
+
 async function fetchXml(url: string): Promise<Document> {
-  let lastErr = '';
-  for (const makeProxy of PROXIES) {
-    try {
-      const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) { lastErr = `HTTP ${res.status}`; continue; }
-      const text = await res.text();
-      // allorigins wraps in JSON
-      let raw = text;
-      try {
-        const json = JSON.parse(text) as { contents?: string };
-        if (json.contents) raw = json.contents;
-      } catch { /* raw HTML/XML */ }
-      return new DOMParser().parseFromString(raw, 'text/xml');
-    } catch (e) {
-      lastErr = String(e);
-    }
+  try {
+    return await Promise.any(PROXIES.map((p) => tryProxyXml(p, url)));
+  } catch {
+    throw new Error(`Feed fetch failed for ${url}`);
   }
-  throw new Error(`Feed fetch failed: ${lastErr}`);
 }
 
 function parseItems(doc: Document, sourceName: string, topic: string): FeedItem[] {
@@ -55,27 +60,33 @@ function parseItems(doc: Document, sourceName: string, topic: string): FeedItem[
   }).filter((i) => i.title && i.url);
 }
 
-export async function fetchFeed(
-  lang: LanguageConfig,
-  interests: string[]
-): Promise<FeedItem[]> {
-  const active = interests.length === 0
-    ? lang.feeds
-    : lang.feeds.filter((f) =>
-        f.topics.some((t) => interests.includes(t) || interests.includes('general'))
-      );
-
+async function fetchFeeds(feeds: LanguageConfig['feeds']): Promise<FeedItem[]> {
   const results = await Promise.allSettled(
-    active.map((f) =>
+    feeds.map((f) =>
       fetchXml(f.url)
         .then((doc) => parseItems(doc, f.name, f.topics[0]))
         .catch(() => [] as FeedItem[])
     )
   );
+  return results.flatMap((r) => r.status === 'fulfilled' ? r.value : []);
+}
 
-  const all: FeedItem[] = results.flatMap((r) =>
-    r.status === 'fulfilled' ? r.value : []
-  );
+export async function fetchFeed(
+  lang: LanguageConfig,
+  interests: string[]
+): Promise<FeedItem[]> {
+  const filtered = interests.length === 0
+    ? lang.feeds
+    : lang.feeds.filter((f) =>
+        f.topics.some((t) => interests.includes(t) || interests.includes('general'))
+      );
+
+  let all = await fetchFeeds(filtered);
+
+  // If filtered feeds returned nothing, fall back to all feeds
+  if (all.length === 0 && filtered.length < lang.feeds.length) {
+    all = await fetchFeeds(lang.feeds);
+  }
 
   // Shuffle slightly so it doesn't always show the same source first
   return all.sort(() => Math.random() - 0.48);

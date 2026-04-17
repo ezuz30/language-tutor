@@ -1,11 +1,17 @@
-import type { LanguageCode } from '@/languages/types';
+import type { LanguageCode, NativeLanguageCode } from '@/languages/types';
+
+export type LearnerLevel = 'first-step' | 'beginner' | 'intermediate' | 'advanced';
+export type Audience = 'kids' | 'adult';
 
 export interface UserSettings {
   anthropicKey: string;
   openaiKey: string;
   elevenlabsKey: string;
   targetLanguage: LanguageCode;
+  nativeLanguage: NativeLanguageCode;
   interests: string[];
+  level: LearnerLevel;
+  audience: Audience;
 }
 
 const STORAGE_KEY = 'language-tutor.settings';
@@ -15,7 +21,10 @@ const defaults: UserSettings = {
   openaiKey: '',
   elevenlabsKey: '',
   targetLanguage: 'es',
+  nativeLanguage: 'en',
   interests: [],
+  level: 'intermediate',
+  audience: 'adult',
 };
 
 export function loadSettings(): UserSettings {

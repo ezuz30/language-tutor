@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getClient } from '@/lib/ai/claude';
 import { tutorFollowUpPrompt } from '@/lib/ai/prompts';
 import type { LanguageConfig } from '@/languages/types';
+import type { LearnerLevel, Audience } from '@/lib/store/keys';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -12,9 +13,11 @@ interface Props {
   lang: LanguageConfig;
   markedText: string;
   initialExplanation: string;
+  level?: LearnerLevel;
+  audience?: Audience;
 }
 
-export default function TutorChat({ lang, markedText, initialExplanation }: Props) {
+export default function TutorChat({ lang, markedText, initialExplanation, level = 'intermediate', audience = 'adult' }: Props) {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: initialExplanation },
   ]);
@@ -34,7 +37,7 @@ export default function TutorChat({ lang, markedText, initialExplanation }: Prop
       const res = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
-        system: tutorFollowUpPrompt(lang),
+        system: tutorFollowUpPrompt(lang, level, audience),
         messages: [
           { role: 'user', content: `The word/phrase being discussed: "${markedText}"` },
           ...next.map((m) => ({ role: m.role, content: m.content })),

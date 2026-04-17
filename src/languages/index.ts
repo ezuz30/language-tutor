@@ -1,8 +1,12 @@
 import type { LanguageCode, LanguageConfig } from './types';
 import { spanish } from './spanish';
+import { hebrew } from './hebrew';
+import { english } from './english';
 
 export const languages: Partial<Record<LanguageCode, LanguageConfig>> = {
   es: spanish,
+  he: hebrew,
+  en: english,
 };
 
 export const defaultLanguage: LanguageCode = 'es';
@@ -14,3 +18,5 @@ export function getLanguage(code: LanguageCode): LanguageConfig {
 }
 
 export type { LanguageConfig, LanguageCode } from './types';
+export { NATIVE_LANGUAGES } from './types';
+export type { NativeLanguageCode, NativeLanguage } from './types';

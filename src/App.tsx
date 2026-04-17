@@ -3,6 +3,8 @@ import Home from './pages/Home';
 import Settings from './pages/Settings';
 import Placeholder from './pages/Placeholder';
 import Reading from './pages/Reading';
+import Speaking from './pages/Speaking';
+import History from './pages/History';
 
 export default function App() {
   return (
@@ -12,8 +14,8 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/read" element={<Reading />} />
         <Route path="/listen" element={<Placeholder title="Listening mode" />} />
-        <Route path="/speak" element={<Placeholder title="Speaking mode" />} />
-        <Route path="/history" element={<Placeholder title="History" />} />
+        <Route path="/speak" element={<Speaking />} />
+        <Route path="/history" element={<History />} />
       </Routes>
     </BrowserRouter>
   );

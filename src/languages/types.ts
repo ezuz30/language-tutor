@@ -1,4 +1,23 @@
-export type LanguageCode = 'es' | 'he' | 'fr' | 'pt' | 'it' | 'en';
+export type LanguageCode = 'es' | 'he' | 'en' | 'fr' | 'pt' | 'it' | 'de' | 'ar';
+
+export type NativeLanguageCode = 'en' | 'he' | 'fr' | 'es' | 'it' | 'de' | 'ar';
+
+export interface NativeLanguage {
+  code: NativeLanguageCode;
+  name: string;
+  nativeName: string;
+  flag: string;
+}
+
+export const NATIVE_LANGUAGES: NativeLanguage[] = [
+  { code: 'en', name: 'English',  nativeName: 'English',   flag: '🇬🇧' },
+  { code: 'he', name: 'Hebrew',   nativeName: 'עברית',     flag: '🇮🇱' },
+  { code: 'fr', name: 'French',   nativeName: 'Français',  flag: '🇫🇷' },
+  { code: 'es', name: 'Spanish',  nativeName: 'Español',   flag: '🇪🇸' },
+  { code: 'it', name: 'Italian',  nativeName: 'Italiano',  flag: '🇮🇹' },
+  { code: 'de', name: 'German',   nativeName: 'Deutsch',   flag: '🇩🇪' },
+  { code: 'ar', name: 'Arabic',   nativeName: 'العربية',   flag: '🇸🇦' },
+];
 
 export interface RssFeed {
   name: string;
