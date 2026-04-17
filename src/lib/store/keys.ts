@@ -39,5 +39,9 @@ export function updateSettings(patch: Partial<UserSettings>): UserSettings {
 }
 
 export function hasRequiredKeys(s: UserSettings = loadSettings()): boolean {
-  return s.anthropicKey.trim().length > 0 && s.openaiKey.trim().length > 0;
+  return s.anthropicKey.trim().length > 0;
+}
+
+export function hasOpenAIKey(s: UserSettings = loadSettings()): boolean {
+  return s.openaiKey.trim().length > 0;
 }

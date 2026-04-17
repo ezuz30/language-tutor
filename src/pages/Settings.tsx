@@ -18,14 +18,20 @@ export default function Settings() {
 
   async function handleSave() {
     setAState('checking');
-    setOState('checking');
-    const [aOk, oOk] = await Promise.all([
-      validateAnthropicKey(anthropicKey),
-      validateOpenAIKey(openaiKey),
-    ]);
+    const aOk = await validateAnthropicKey(anthropicKey);
     setAState(aOk ? 'ok' : 'bad');
-    setOState(oOk ? 'ok' : 'bad');
-    if (aOk && oOk) {
+
+    // OpenAI is optional — only validate if a key was provided
+    if (openaiKey.trim()) {
+      setOState('checking');
+      const oOk = await validateOpenAIKey(openaiKey);
+      setOState(oOk ? 'ok' : 'bad');
+      if (!oOk) return;
+    } else {
+      setOState('idle');
+    }
+
+    if (aOk) {
       saveSettings({ ...initial, anthropicKey, openaiKey, elevenlabsKey });
       setSaved(true);
       setTimeout(() => navigate('/'), 600);
@@ -50,10 +56,11 @@ export default function Settings() {
         />
         <Field
           label="OpenAI API key"
-          hint="platform.openai.com — used for Whisper speech-to-text"
+          hint="Optional — upgrades speaking to Whisper (more accurate). Skip to use the free browser mic."
           value={openaiKey}
           onChange={setOpenaiKey}
           state={oState}
+          optional
         />
         <Field
           label="ElevenLabs API key"
